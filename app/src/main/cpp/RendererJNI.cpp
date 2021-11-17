@@ -7,11 +7,17 @@
 #include <GLES3/gl3.h>
 #include <android/asset_manager_jni.h>
 #include <android/log.h>
+#include <vector>
 
 #define LOG_TAG "ndk-build"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
 GLint	g_programObject;
+
+GLuint g_texture_id = 0;
+GLint g_sampler_loc = -1;
+
 jint	g_width;
 jint	g_height;
 
@@ -93,22 +99,27 @@ GLuint LoadShader ( GLenum type, const char *shaderSrc )
 //*********************************************************************************
 extern "C" JNIEXPORT void JNICALL Java_com_zsw_opengles_1demo_RendererJNI_glesInit
         (JNIEnv *pEnv, jobject obj){
-    char vShaderStr[] =
-            "#version 300 es                          \n"
-            "layout(location = 0) in vec4 vPosition;  \n"
-            "void main()                              \n"
-            "{                                        \n"
-            "   gl_Position = vPosition;              \n"
-            "}                                        \n";
+    char vShaderStr[] = R"(
+#version 300 es
+layout(location = 0) in vec4 vPosition;
+out vec2 v_texcoord;
+void main()
+{
+    v_texcoord = 0.5*(vPosition.xy + vec2(1.0));
+    gl_Position = vPosition;
+})";
 
-    char fShaderStr[] =
-            "#version 300 es                              \n"
-            "precision mediump float;                     \n"
-            "out vec4 fragColor;                          \n"
-            "void main()                                  \n"
-            "{                                            \n"
-            "   fragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );  \n"
-            "}                                            \n";
+    char fShaderStr[] = R"(
+#version 300 es
+precision mediump float;
+in vec2 v_texcoord;
+out vec4 fragColor;
+uniform sampler2D s_tex_sprite;
+void main()
+{
+    //fragColor = vec4(v_texcoord.x, v_texcoord.y, 0.0, 1.0);
+    fragColor = texture(s_tex_sprite, v_texcoord);
+})";
 
 //    char *pVertexShader = readShaderSrcFile("shader/vs.glsl", g_pAssetManager);
 //    char *pFragmentShader = readShaderSrcFile("shader/fs.glsl", g_pAssetManager);
@@ -163,7 +174,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_zsw_opengles_1demo_RendererJNI_glesIn
 
     // Store the program object
     g_programObject = programObject;
-
+    g_sampler_loc = glGetUniformLocation(g_programObject, "s_tex_sprite");
     glClearColor ( 1.0f, 1.0f, 1.0f, 0.0f );
 }
 
@@ -192,8 +203,33 @@ extern "C" JNIEXPORT void JNICALL Java_com_zsw_opengles_1demo_RendererJNI_glesRe
     glVertexAttribPointer ( 0, 3, GL_FLOAT, GL_FALSE, 0, vVertices );
     glEnableVertexAttribArray ( 0 );
 
-    glDrawArrays ( GL_TRIANGLES, 0, 3 );
+    /// create texture
+    if(g_texture_id != 0) {
+        glDeleteTextures(1, &g_texture_id);
+        g_texture_id = 0;
+    }
 
+    std::vector<unsigned char> pixels(1920*1080*4, 0);
+    for(int i=0; i<1920*1080; ++i)
+    {
+        pixels[i*4] = 255;
+    }
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glGenTextures(1, &g_texture_id);
+    glBindTexture(GL_TEXTURE_2D, g_texture_id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1920, 1080, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, pixels.data());
+    // Set the filtering mode
+    glTexParameteri ( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+    glTexParameteri ( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+
+
+    /// bind and use texture
+    glActiveTexture ( GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, g_texture_id);
+    // Set the sampler texture unit to 0
+    glUniform1i ( g_sampler_loc, 0 );
+    glDrawArrays ( GL_TRIANGLES, 0, 3 );
 }
 
 /*
