@@ -14,7 +14,7 @@ import static android.opengl.GLSurfaceView.RENDERMODE_WHEN_DIRTY;
 
 public class MainActivity extends AppCompatActivity {
 
-    private final int CONTEXT_CLIENT_VERSION = 3;
+    private final int CONTEXT_CLIENT_VERSION = 2;
     private GLSurfaceView mGLSurfaceView;
     RendererJNI mRenderer;
 

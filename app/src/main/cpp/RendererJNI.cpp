@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <GLES3/gl3.h>
+#include <GLES2/gl2.h>
 #include <android/asset_manager_jni.h>
 #include <android/log.h>
 #include <vector>
@@ -17,6 +17,7 @@ GLint	g_programObject;
 
 GLuint g_texture_id = 0;
 GLint g_sampler_loc = -1;
+GLint g_position_loc = -1;
 
 jint	g_width;
 jint	g_height;
@@ -100,9 +101,8 @@ GLuint LoadShader ( GLenum type, const char *shaderSrc )
 extern "C" JNIEXPORT void JNICALL Java_com_zsw_opengles_1demo_RendererJNI_glesInit
         (JNIEnv *pEnv, jobject obj){
     char vShaderStr[] = R"(
-#version 300 es
-layout(location = 0) in vec4 vPosition;
-out vec2 v_texcoord;
+attribute vec4 vPosition;
+varying vec2 v_texcoord;
 void main()
 {
     v_texcoord = 0.5*(vPosition.xy + vec2(1.0));
@@ -110,15 +110,13 @@ void main()
 })";
 
     char fShaderStr[] = R"(
-#version 300 es
 precision mediump float;
-in vec2 v_texcoord;
-out vec4 fragColor;
+varying vec2 v_texcoord;
 uniform sampler2D s_tex_sprite;
 void main()
 {
     //fragColor = vec4(v_texcoord.x, v_texcoord.y, 0.0, 1.0);
-    fragColor = texture(s_tex_sprite, v_texcoord);
+    gl_FragColor = texture2D(s_tex_sprite, v_texcoord);
 })";
 
 //    char *pVertexShader = readShaderSrcFile("shader/vs.glsl", g_pAssetManager);
@@ -175,6 +173,7 @@ void main()
     // Store the program object
     g_programObject = programObject;
     g_sampler_loc = glGetUniformLocation(g_programObject, "s_tex_sprite");
+    g_position_loc = glGetAttribLocation (g_programObject, "vPosition" );
     glClearColor ( 1.0f, 1.0f, 1.0f, 0.0f );
 }
 
@@ -200,8 +199,8 @@ extern "C" JNIEXPORT void JNICALL Java_com_zsw_opengles_1demo_RendererJNI_glesRe
     glUseProgram ( g_programObject );
 
     // Load the vertex data
-    glVertexAttribPointer ( 0, 3, GL_FLOAT, GL_FALSE, 0, vVertices );
-    glEnableVertexAttribArray ( 0 );
+    glVertexAttribPointer ( g_position_loc, 3, GL_FLOAT, GL_FALSE, 0, vVertices );
+    glEnableVertexAttribArray ( g_position_loc );
 
     /// create texture
     if(g_texture_id != 0) {
